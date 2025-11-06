@@ -32,10 +32,28 @@ make build-local
 
 ### Docker Build
 
+**Simple build:**
 ```bash
 make docker
 docker run --rm ghcr.io/paragkamble/s3-workload:latest --help
 ```
+
+**Using build scripts** (recommended):
+```bash
+# Build locally
+./scripts/build-image.sh
+
+# Build and push to registry
+./scripts/build-image.sh --version v1.0.0 --push
+
+# Build for multiple architectures
+./scripts/build-multiarch.sh
+
+# Or use make targets
+make docker-build-push VERSION=v1.0.0
+```
+
+See [scripts/README.md](scripts/README.md) for detailed build instructions.
 
 ### Kubernetes Deployment
 

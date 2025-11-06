@@ -184,8 +184,24 @@ Complete set of production-ready manifests:
 - `make build-local` - Build for local OS
 - `make test` - Run tests with coverage
 - `make docker` - Build Docker image
+- `make docker-build` - Build using scripts/build-image.sh
+- `make docker-build-push` - Build and push to registry
+- `make docker-multiarch` - Build multi-architecture image
 - `make lint` - Run linters
 - `make clean` - Clean artifacts
+
+**`scripts/` Directory** ✨ NEW
+- `scripts/build-image.sh` - Comprehensive Docker build script
+  - Multi-registry support (GHCR, Docker Hub, Quay.io, custom)
+  - Single and multi-architecture builds
+  - Automatic version tagging
+  - Build caching control
+  - Works with Docker and Podman
+- `scripts/build-multiarch.sh` - Multi-architecture build helper
+  - Builds for amd64 and arm64
+  - Uses Docker buildx
+- `scripts/push-image.sh` - Push images to registry
+- `scripts/README.md` - Comprehensive build documentation
 
 **`.gitignore`**
 - Standard Go ignores

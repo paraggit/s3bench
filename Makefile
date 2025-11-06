@@ -39,12 +39,21 @@ fmt: ## Format code
 vet: ## Run go vet
 	go vet ./...
 
-docker: ## Build Docker image
+docker: ## Build Docker image (use scripts/build-image.sh for advanced options)
 	docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) -t $(DOCKER_IMAGE):latest .
 
 docker-push: docker ## Build and push Docker image
 	docker push $(DOCKER_IMAGE):$(DOCKER_TAG)
 	docker push $(DOCKER_IMAGE):latest
+
+docker-build: ## Build image using scripts/build-image.sh
+	./scripts/build-image.sh --registry $(DOCKER_REGISTRY) --name $(subst $(DOCKER_REGISTRY)/,,$(DOCKER_IMAGE)) --version $(DOCKER_TAG)
+
+docker-build-push: ## Build and push image using scripts/build-image.sh
+	./scripts/build-image.sh --registry $(DOCKER_REGISTRY) --name $(subst $(DOCKER_REGISTRY)/,,$(DOCKER_IMAGE)) --version $(DOCKER_TAG) --push
+
+docker-multiarch: ## Build multi-architecture image (amd64, arm64)
+	./scripts/build-multiarch.sh
 
 clean: ## Clean build artifacts
 	rm -rf bin/
