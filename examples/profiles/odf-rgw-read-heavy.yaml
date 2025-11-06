@@ -1,0 +1,53 @@
+# ODF RGW Read-Heavy Workload Profile
+# Tests RGW read performance and caching behavior
+
+endpoint: "https://s3.openshift-storage.svc.cluster.local"
+region: "us-east-1"
+bucket: "odf-bench-read-heavy"
+path_style: true
+skip_tls_verify: false
+create_bucket: true
+
+# Very high concurrency for read-intensive workload
+concurrency: 256
+
+# Read-heavy operation mix
+# 70% GET - Heavy read load
+# 15% HEAD - Metadata operations (lightweight)
+# 10% LIST - Directory listing operations
+# 5% PUT - Maintain fresh data
+mix:
+  get: 70
+  head: 15
+  list: 10
+  put: 5
+
+duration: 30m
+
+# Smaller objects for read testing
+# Log-normal distribution with mean of 512KiB
+size: "dist:lognormal:mean=512KiB,std=0.4"
+
+# Moderate keyspace - allows for cache hits
+keys: 50000
+prefix: "read-bench/"
+key_template: "read-{seq:08}.bin"
+
+pattern: "random:54321"
+verify_rate: 0.2  # Higher verify rate for read testing
+
+# Optional: Add rate limiting to simulate controlled load
+rate_type: "fixed"
+rate_limit: 0  # Set to e.g., 1000 for 1000 ops/sec
+
+op_timeout: 30s
+max_retries: 3
+retry_backoff: 100ms
+
+namespace_tag: "workload=read-heavy"
+keep_data: false
+
+metrics_port: 9090
+http_bind: "0.0.0.0"
+log_level: "info"
+

@@ -1,8 +1,10 @@
 # S3-Workload Project Overview
 
-## Project Status: ✅ Complete
+## Project Status: ✅ Complete + OpenShift ODF/RGW Compatible
 
 Production-grade S3 workload generator built with Go 1.21+ for Kubernetes/OpenShift environments.
+
+**✨ Now fully compatible with OpenShift Data Foundation (ODF) and Ceph Rados Gateway (RGW)!**
 
 ## 📋 Delivered Components
 
@@ -99,7 +101,9 @@ Complete set of production-ready manifests:
 - `serviceaccount.yaml` - Service account with minimal permissions
 - `secret.yaml` - S3 credentials template
 - `configmap.yaml` - Workload configuration
+- `configmap-odf-rgw.yaml` - ODF/RGW-specific configuration ✨ NEW
 - `deployment.yaml` - Long-running workload deployment
+- `deployment-odf-rgw.yaml` - ODF/RGW-specific deployment ✨ NEW
 - `job.yaml` - Finite workload job
 - `service.yaml` - Metrics service
 - `servicemonitor.yaml` - Prometheus ServiceMonitor
@@ -139,8 +143,18 @@ Complete set of production-ready manifests:
 - Docker deployment
 - Kubernetes deployment (vanilla and kustomize)
 - OpenShift-specific instructions
+- OpenShift ODF/RGW quick reference
 - Prometheus integration
 - Troubleshooting guide
+
+**`docs/ODF_RGW_SETUP.md`** ✨ NEW
+- Complete OpenShift ODF/RGW setup guide
+- RGW endpoint discovery
+- Credential management (Noobaa and Ceph RGW)
+- TLS configuration for self-signed certificates
+- ODF-specific workload profiles
+- Comprehensive troubleshooting
+- Performance tuning recommendations
 
 **`LICENSE`**
 - MIT License
@@ -155,6 +169,10 @@ Complete set of production-ready manifests:
 - `examples/profiles/read-heavy.yaml` - 80% reads
 - `examples/profiles/write-heavy.yaml` - 70% writes
 - `examples/profiles/balanced.yaml` - Mixed workload
+- `examples/profiles/odf-rgw-balanced.yaml` - ODF/RGW balanced workload ✨ NEW
+- `examples/profiles/odf-rgw-read-heavy.yaml` - ODF/RGW read-heavy ✨ NEW
+- `examples/profiles/odf-rgw-write-heavy.yaml` - ODF/RGW write-heavy ✨ NEW
+- `examples/profiles/odf-rgw-large-objects.yaml` - ODF/RGW large objects ✨ NEW
 
 **`examples/cleanup.sh`**
 - Shell script for cleanup operations

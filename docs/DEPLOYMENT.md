@@ -142,9 +142,11 @@ kubectl apply -k .
 
 ### Prerequisites
 
-- OpenShift cluster (4.x+)
+- OpenShift cluster (4.10+)
 - oc CLI configured
-- S3-compatible storage (e.g., ODF/Ceph RGW)
+- S3-compatible storage (e.g., **ODF/Ceph RGW**, MinIO, or external S3)
+
+> **💡 For OpenShift ODF/RGW:** See comprehensive setup guide at [ODF_RGW_SETUP.md](ODF_RGW_SETUP.md)
 
 ### Deploy to OpenShift
 
@@ -164,11 +166,20 @@ oc create secret generic s3-creds \
 
 3. **Create config:**
 
+For ODF/RGW (recommended):
+```bash
+# Use the ODF-specific ConfigMap
+oc apply -f deploy/kubernetes/configmap-odf-rgw.yaml
+```
+
+Or create manually:
 ```bash
 oc create configmap s3-workload-config \
-  --from-literal=endpoint=https://rgw.openshift-storage.svc:443 \
+  --from-literal=endpoint=https://s3.openshift-storage.svc.cluster.local \
   --from-literal=region=us-east-1 \
   --from-literal=bucket=bench-bucket \
+  --from-literal=path-style=true \
+  --from-literal=skip-tls-verify=false \
   --from-literal=concurrency=64 \
   --from-literal=duration=30m \
   --from-literal=mix="put=40,get=40,delete=10,copy=5,list=5"
@@ -176,6 +187,16 @@ oc create configmap s3-workload-config \
 
 4. **Deploy:**
 
+For ODF/RGW (recommended):
+```bash
+# Deploy all resources including ServiceAccount, ConfigMap, Deployment, and Service
+oc apply -f deploy/kubernetes/serviceaccount.yaml
+oc apply -f deploy/kubernetes/configmap-odf-rgw.yaml
+oc apply -f deploy/kubernetes/deployment-odf-rgw.yaml
+oc apply -f deploy/kubernetes/service.yaml
+```
+
+For other S3 services:
 ```bash
 oc apply -f deploy/kubernetes/deployment.yaml
 ```
@@ -190,6 +211,12 @@ oc get route s3-workload-metrics
 ### OpenShift Considerations
 
 - **Security Context Constraints (SCC):** The deployment uses non-root user (10001) and read-only root filesystem, compatible with restricted SCC.
+
+- **ODF/RGW Specific Settings:**
+  - Always use `--path-style=true` for RGW compatibility
+  - Internal endpoint: `https://s3.openshift-storage.svc.cluster.local`
+  - For external access, create a route or use the existing RGW route
+  - See [ODF_RGW_SETUP.md](ODF_RGW_SETUP.md) for credential setup
 
 - **Service Mesh:** If using OpenShift Service Mesh, add sidecar injection:
 
@@ -206,6 +233,26 @@ oc create route edge s3-workload-metrics \
   --service=s3-workload-metrics \
   --port=http
 ```
+
+### OpenShift ODF/RGW Quick Reference
+
+```bash
+# Get RGW endpoint
+oc get route -n openshift-storage | grep s3
+
+# Get RGW credentials (if using Noobaa)
+oc get secret noobaa-admin -n openshift-storage -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d
+
+# Create RGW user (if using Ceph directly)
+TOOLS_POD=$(oc get pods -n openshift-storage -l app=rook-ceph-tools -o jsonpath='{.items[0].metadata.name}')
+oc exec -n openshift-storage $TOOLS_POD -- radosgw-admin user create --uid=s3-benchmark
+
+# Test connectivity
+oc run -it --rm test-s3 --image=amazon/aws-cli --restart=Never -- \
+  s3 ls --endpoint-url=https://s3.openshift-storage.svc.cluster.local
+```
+
+For complete ODF/RGW setup instructions, see [ODF_RGW_SETUP.md](ODF_RGW_SETUP.md).
 
 ## Prometheus Integration
 

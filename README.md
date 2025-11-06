@@ -1,6 +1,10 @@
 # s3-workload
 
-A production-grade S3 workload generator for benchmarking and testing object storage systems (AWS S3, MinIO, Ceph RGW, etc.) in Kubernetes/OpenShift environments.
+A production-grade S3 workload generator for benchmarking and testing object storage systems (AWS S3, MinIO, Ceph RGW, OpenShift ODF, etc.) in Kubernetes/OpenShift environments.
+
+## ⭐ OpenShift ODF/RGW Support
+
+Fully compatible with **OpenShift Data Foundation (ODF)** and **Ceph Rados Gateway (RGW)**. See [docs/ODF_RGW_SETUP.md](docs/ODF_RGW_SETUP.md) for detailed setup guide.
 
 ## Features
 
@@ -39,6 +43,43 @@ docker run --rm ghcr.io/paragkamble/s3-workload:latest --help
 kubectl apply -f deploy/kubernetes/
 ```
 
+### OpenShift ODF/RGW Deployment
+
+#### Quick Deploy (Automated Script)
+
+```bash
+# Automatic deployment with credential detection
+cd examples
+./deploy-odf-rgw.sh
+
+# Or with custom credentials
+export RGW_ACCESS_KEY=your_access_key
+export RGW_SECRET_KEY=your_secret_key
+./deploy-odf-rgw.sh
+```
+
+#### Manual Deployment
+
+```bash
+# Quick start for OpenShift ODF
+oc new-project s3-workload
+oc create secret generic s3-creds \
+  --from-literal=accessKey=YOUR_RGW_ACCESS_KEY \
+  --from-literal=secretKey=YOUR_RGW_SECRET_KEY
+
+# Deploy with ODF-specific configuration
+oc apply -f deploy/kubernetes/namespace.yaml
+oc apply -f deploy/kubernetes/serviceaccount.yaml
+oc apply -f deploy/kubernetes/configmap-odf-rgw.yaml
+oc apply -f deploy/kubernetes/deployment-odf-rgw.yaml
+oc apply -f deploy/kubernetes/service.yaml
+
+# Follow logs
+oc logs -n s3-workload -l app=s3-workload -f
+```
+
+See [docs/ODF_RGW_SETUP.md](docs/ODF_RGW_SETUP.md) for complete setup instructions.
+
 ## CLI Reference
 
 ```bash
@@ -61,12 +102,27 @@ s3-workload \
 
 See [docs/CLI.md](docs/CLI.md) for full flag reference.
 
+### ODF/RGW Example
+
+```bash
+s3-workload \
+  --endpoint https://s3.openshift-storage.svc.cluster.local \
+  --region us-east-1 \
+  --bucket odf-bench-bucket \
+  --path-style \
+  --create-bucket \
+  --concurrency 64 \
+  --mix put=40,get=40,delete=10,copy=5,list=5 \
+  --duration 30m \
+  --config examples/profiles/odf-rgw-balanced.yaml
+```
+
 ## Configuration
 
 Configuration can be provided via:
 1. Command-line flags
 2. YAML configuration file (`--config workload.yaml`)
-3. Environment variables (see [docs/CONFIGURATION.md](docs/CONFIGURATION.md))
+3. Environment variables (prefix with `S3BENCH_`)
 
 Example `workload.yaml`:
 ```yaml
@@ -81,6 +137,19 @@ mix:
   copy: 5
   list: 5
 ```
+
+### Workload Profiles
+
+Pre-configured profiles available in `examples/profiles/`:
+- `balanced.yaml` - General purpose workload (50% PUT, 50% GET)
+- `read-heavy.yaml` - Read-intensive workload (80% reads)
+- `write-heavy.yaml` - Write-intensive workload (70% writes)
+- **`odf-rgw-balanced.yaml`** - Balanced workload optimized for ODF/RGW
+- **`odf-rgw-read-heavy.yaml`** - Read-heavy workload for RGW
+- **`odf-rgw-write-heavy.yaml`** - Write-heavy workload for RGW
+- **`odf-rgw-large-objects.yaml`** - Large object testing for RGW
+
+Use with: `--config examples/profiles/odf-rgw-balanced.yaml`
 
 ## Metrics
 

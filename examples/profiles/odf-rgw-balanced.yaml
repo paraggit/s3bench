@@ -1,0 +1,85 @@
+# ODF RGW Balanced Workload Profile
+# Suitable for general-purpose RGW testing with realistic workload distribution
+
+# S3 Connection - Update these for your ODF deployment
+endpoint: "https://s3.openshift-storage.svc.cluster.local"
+region: "us-east-1"
+bucket: "odf-bench-bucket"
+
+# RGW requires path-style addressing
+path_style: true
+
+# Set to true if using self-signed certificates
+skip_tls_verify: false
+
+# Create bucket if it doesn't exist
+create_bucket: true
+
+# Workload Configuration
+# 64 concurrent workers provides good balance between throughput and resource usage
+concurrency: 64
+
+# Balanced operation mix
+# 40% PUT - Create new objects
+# 40% GET - Read objects
+# 10% DELETE - Remove objects
+# 5% COPY - Copy objects within bucket
+# 5% LIST - List bucket contents
+mix:
+  put: 40
+  get: 40
+  delete: 10
+  copy: 5
+  list: 5
+
+# Run for 30 minutes
+duration: 30m
+
+# Object Configuration
+# Log-normal distribution simulates real-world object size patterns
+# Mean of 1MiB with standard deviation of 0.6
+size: "dist:lognormal:mean=1MiB,std=0.6"
+
+# Keyspace of 100,000 unique objects
+keys: 100000
+
+# Prefix for easy cleanup and isolation
+prefix: "bench/"
+
+# Key template with 8-digit sequence numbers
+key_template: "obj-{seq:08}.bin"
+
+# Data Pattern
+# Deterministic random data with seed 42 for reproducibility
+pattern: "random:42"
+
+# Verify 10% of GET operations
+verify_rate: 0.1
+
+# Rate Limiting
+# No rate limiting - generate as much load as possible
+rate_type: "fixed"
+rate_limit: 0  # 0 = unlimited
+
+# Timeouts and Retries
+# 30 second timeout per operation
+op_timeout: 30s
+
+# Retry up to 3 times on failures
+max_retries: 3
+
+# Start with 100ms backoff, doubles on each retry
+retry_backoff: 100ms
+
+# Cleanup and Safety
+# Tag objects with namespace for easy identification
+namespace_tag: "env=benchmark"
+
+# Don't keep data after DELETE operations
+keep_data: false
+
+# Observability
+metrics_port: 9090
+http_bind: "0.0.0.0"
+log_level: "info"
+

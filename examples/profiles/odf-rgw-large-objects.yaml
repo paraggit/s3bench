@@ -1,0 +1,52 @@
+# ODF RGW Large Object Testing Profile
+# Tests RGW performance with large objects (typical for backup/archive workloads)
+
+endpoint: "https://s3.openshift-storage.svc.cluster.local"
+region: "us-east-1"
+bucket: "odf-bench-large-objects"
+path_style: true
+skip_tls_verify: false
+create_bucket: true
+
+# Lower concurrency for large objects to avoid memory issues
+concurrency: 32
+
+# Simplified mix for large objects
+# 50% PUT - Write large objects
+# 40% GET - Read large objects
+# 10% DELETE - Cleanup
+mix:
+  put: 50
+  get: 40
+  delete: 10
+
+duration: 30m
+
+# Large objects with log-normal distribution
+# Mean of 100MiB - tests handling of substantial objects
+size: "dist:lognormal:mean=100MiB,std=0.5"
+
+# Smaller keyspace due to large object sizes
+keys: 10000
+prefix: "large-bench/"
+key_template: "large-{seq:06}.bin"
+
+pattern: "random:99999"
+verify_rate: 0.1
+
+# No rate limiting
+rate_type: "fixed"
+rate_limit: 0
+
+# Much longer timeout for large objects
+op_timeout: 300s  # 5 minutes
+max_retries: 2
+retry_backoff: 500ms
+
+namespace_tag: "workload=large-objects"
+keep_data: false
+
+metrics_port: 9090
+http_bind: "0.0.0.0"
+log_level: "info"
+

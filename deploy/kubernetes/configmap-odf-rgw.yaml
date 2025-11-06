@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: s3-workload-config
+  namespace: s3-workload
+  labels:
+    app: s3-workload
+    storage: odf-rgw
+data:
+  # OpenShift ODF RGW endpoint configuration
+  # For internal service access (recommended for workloads running in OpenShift)
+  endpoint: "https://s3.openshift-storage.svc.cluster.local"
+  
+  # For external route access (use this if testing from outside the cluster)
+  # endpoint: "https://s3-rgw-openshift-storage.apps.your-cluster-domain.com"
+  
+  # Region - can be any value for RGW
+  region: "us-east-1"
+  
+  # S3 bucket name - will be created if it doesn't exist
+  bucket: "odf-bench-bucket"
+  
+  # RGW-specific settings
+  # Path-style addressing is required for RGW
+  path-style: "true"
+  
+  # Set to true if using self-signed certificates
+  skip-tls-verify: "false"
+  
+  # Workload configuration
+  concurrency: "64"
+  duration: "30m"
+  keys: "100000"
+  prefix: "bench/"
+  
+  # Operation mix optimized for RGW testing
+  # Balanced workload for comprehensive testing
+  mix: "put=40,get=40,delete=10,copy=5,list=5"
+  
+  # Object size distribution
+  # Log-normal distribution simulates realistic workloads
+  size: "dist:lognormal:mean=1MiB,std=0.6"
+  
+  # Data pattern and verification
+  pattern: "random:42"
+  verify-rate: "0.1"
+  
+  # Observability
+  log-level: "info"
+  metrics-port: "9090"
+

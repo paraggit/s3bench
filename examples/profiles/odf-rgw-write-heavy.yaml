@@ -1,0 +1,52 @@
+# ODF RGW Write-Heavy Workload Profile
+# Tests RGW write performance and OSD throughput
+
+endpoint: "https://s3.openshift-storage.svc.cluster.local"
+region: "us-east-1"
+bucket: "odf-bench-write-heavy"
+path_style: true
+skip_tls_verify: false
+create_bucket: true
+
+# Higher concurrency for write-intensive workload
+concurrency: 128
+
+# Write-heavy operation mix
+# 70% PUT - Heavy write load
+# 20% GET - Verify written data
+# 5% DELETE - Cleanup to prevent bucket growth
+# 5% COPY - Test server-side copy performance
+mix:
+  put: 70
+  get: 20
+  delete: 5
+  copy: 5
+
+duration: 30m
+
+# Fixed 4MiB objects for consistent write performance testing
+size: "fixed:4MiB"
+
+# Large keyspace to prevent overwrites
+keys: 500000
+prefix: "write-bench/"
+key_template: "write-{seq:08}.bin"
+
+pattern: "random:12345"
+verify_rate: 0.05  # Lower verify rate to focus on writes
+
+# No rate limiting for maximum throughput
+rate_type: "fixed"
+rate_limit: 0
+
+op_timeout: 60s  # Longer timeout for large objects
+max_retries: 3
+retry_backoff: 200ms
+
+namespace_tag: "workload=write-heavy"
+keep_data: false
+
+metrics_port: 9090
+http_bind: "0.0.0.0"
+log_level: "info"
+

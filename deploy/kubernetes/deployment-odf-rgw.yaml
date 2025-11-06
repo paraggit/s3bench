@@ -1,0 +1,179 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s3-workload
+  namespace: s3-workload
+  labels:
+    app: s3-workload
+    storage: odf-rgw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: s3-workload
+  template:
+    metadata:
+      labels:
+        app: s3-workload
+        storage: odf-rgw
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: s3-workload
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+      - name: s3-workload
+        image: ghcr.io/paragkamble/s3-workload:latest
+        imagePullPolicy: Always
+        args:
+          - --endpoint=$(S3_ENDPOINT)
+          - --region=$(AWS_REGION)
+          - --bucket=$(S3_BUCKET)
+          - --path-style=$(PATH_STYLE)
+          - --skip-tls-verify=$(SKIP_TLS_VERIFY)
+          - --create-bucket
+          - --concurrency=$(CONCURRENCY)
+          - --mix=$(MIX)
+          - --size=$(SIZE)
+          - --keys=$(KEYS)
+          - --prefix=$(PREFIX)
+          - --pattern=$(PATTERN)
+          - --verify-rate=$(VERIFY_RATE)
+          - --duration=$(DURATION)
+          - --metrics-port=$(METRICS_PORT)
+          - --log-level=$(LOG_LEVEL)
+          - --http-bind=0.0.0.0
+        env:
+        # S3 Configuration from ConfigMap
+        - name: S3_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: endpoint
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: region
+        - name: S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: bucket
+        - name: PATH_STYLE
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: path-style
+        - name: SKIP_TLS_VERIFY
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: skip-tls-verify
+        - name: CONCURRENCY
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: concurrency
+        - name: DURATION
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: duration
+        - name: KEYS
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: keys
+        - name: PREFIX
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: prefix
+        - name: MIX
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: mix
+        - name: SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: size
+        - name: PATTERN
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: pattern
+        - name: VERIFY_RATE
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: verify-rate
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: log-level
+        - name: METRICS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: metrics-port
+        
+        # S3 Credentials from Secret
+        # For ODF RGW, these are the RGW user credentials
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: s3-creds
+              key: accessKey
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: s3-creds
+              key: secretKey
+        
+        ports:
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: metrics
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+        
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: metrics
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+        
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "2000m"
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 10001
+          capabilities:
+            drop:
+              - ALL
+
