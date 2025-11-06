@@ -1,0 +1,27 @@
+# Write-heavy workload profile
+# Simulates applications with mostly write operations
+
+endpoint: https://s3.amazonaws.com
+region: us-east-1
+bucket: bench-bucket
+concurrency: 64
+
+# Write-heavy mix
+mix:
+  put: 70
+  get: 20
+  delete: 5
+  copy: 5
+
+# Variable object sizes
+size: "dist:lognormal:mean=2MiB,std=0.8"
+keys: 100000
+prefix: "write-heavy/"
+
+# Low verification rate (focus on throughput)
+pattern: "random:2025"
+verify_rate: 0.05
+
+duration: 30m
+log_level: info
+

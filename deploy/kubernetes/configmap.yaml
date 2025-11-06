@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: s3-workload-config
+  namespace: s3-workload
+  labels:
+    app: s3-workload
+data:
+  # S3 endpoint configuration
+  endpoint: "https://s3.amazonaws.com"
+  region: "us-east-1"
+  bucket: "bench-bucket"
+  
+  # Workload configuration
+  concurrency: "64"
+  duration: "30m"
+  keys: "100000"
+  prefix: "bench/"
+  
+  # Operation mix (percentages)
+  mix: "put=40,get=40,delete=10,copy=5,list=5"
+  
+  # Object size
+  size: "dist:lognormal:mean=1MiB,std=0.6"
+  
+  # Data pattern
+  pattern: "random:42"
+  verify-rate: "0.1"
+  
+  # Observability
+  log-level: "info"
+  metrics-port: "9090"
+

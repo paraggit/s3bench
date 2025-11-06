@@ -1,0 +1,28 @@
+# Balanced workload profile
+# Simulates mixed workloads with balanced operations
+
+endpoint: https://s3.amazonaws.com
+region: us-east-1
+bucket: bench-bucket
+concurrency: 96
+
+# Balanced mix
+mix:
+  put: 35
+  get: 35
+  delete: 15
+  copy: 10
+  list: 5
+
+# Medium object sizes
+size: "dist:lognormal:mean=1MiB,std=0.6"
+keys: 200000
+prefix: "balanced/"
+
+# Moderate verification
+pattern: "random:2025"
+verify_rate: 0.2
+
+duration: 45m
+log_level: info
+

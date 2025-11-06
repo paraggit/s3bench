@@ -1,0 +1,28 @@
+# Read-heavy workload profile
+# Simulates applications with mostly read operations
+
+endpoint: https://s3.amazonaws.com
+region: us-east-1
+bucket: bench-bucket
+concurrency: 128
+
+# Read-heavy mix
+mix:
+  get: 80
+  head: 10
+  list: 5
+  put: 5
+
+# Large keyspace for realistic read patterns
+size: "dist:lognormal:mean=512KiB,std=0.4"
+keys: 500000
+prefix: "read-heavy/"
+random_keys: true
+
+# High verification rate for reads
+pattern: "random:2025"
+verify_rate: 0.5
+
+duration: 1h
+log_level: info
+

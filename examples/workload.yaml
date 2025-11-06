@@ -1,0 +1,63 @@
+# Example s3-workload configuration file
+# Use with: s3-workload --config workload.yaml
+
+# S3 Connection
+endpoint: https://s3.amazonaws.com
+region: us-east-1
+bucket: bench-bucket
+# access_key and secret_key can be set via env vars:
+# AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+path_style: false
+skip_tls_verify: false
+
+# Bucket Management
+create_bucket: true
+versioning: keep  # on, off, or keep
+
+# Workload Parameters
+concurrency: 64
+duration: 30m  # or use operations: 1000000
+
+# Operation Mix (percentages, will be normalized to 100)
+mix:
+  put: 40
+  get: 40
+  delete: 10
+  copy: 5
+  list: 5
+
+# Object Configuration
+size: "dist:lognormal:mean=1MiB,std=0.6"  # or "fixed:1MiB"
+keys: 100000
+prefix: "bench/"
+key_template: "obj-{seq:08}.bin"  # results in: bench/obj-00000042.bin
+random_keys: false
+
+# Data Pattern & Verification
+pattern: "random:42"  # or "fixed:DEADBEEF"
+verify_rate: 0.1  # Verify 10% of GET operations
+
+# Rate Limiting
+rate_type: fixed  # or "poisson"
+rate_limit: 0  # 0 = unlimited, otherwise QPS
+
+# Timeouts & Retries
+op_timeout: 30s
+max_retries: 3
+retry_backoff: 100ms
+
+# Copy Operation (optional)
+# copy_dst_bucket: "destination-bucket"
+
+# Safety & Cleanup
+namespace_tag: "env=perf,team=platform"
+keep_data: false
+cleanup: false
+dry_run: false
+
+# Observability
+metrics_port: 9090
+http_bind: "0.0.0.0"
+log_level: info  # debug, info, warn, error
+pprof_port: 0  # Set to enable pprof, e.g., 6060
+

@@ -1,0 +1,30 @@
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+bin/
+dist/
+*.test
+*.out
+
+# Documentation
+*.md
+docs/
+
+# Kubernetes
+deploy/
+
+# Config
+*.local.yaml
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+

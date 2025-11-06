@@ -1,0 +1,99 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: s3-workload-job
+  namespace: s3-workload
+  labels:
+    app: s3-workload
+spec:
+  # Don't restart on failure - let job fail
+  backoffLimit: 0
+  
+  template:
+    metadata:
+      labels:
+        app: s3-workload
+        job: s3-workload-job
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: s3-workload
+      restartPolicy: Never
+      
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      
+      containers:
+      - name: s3-workload
+        image: ghcr.io/paragkamble/s3-workload:latest
+        imagePullPolicy: Always
+        args:
+          - --endpoint=$(S3_ENDPOINT)
+          - --region=$(AWS_REGION)
+          - --bucket=$(S3_BUCKET)
+          - --create-bucket
+          - --concurrency=64
+          - --mix=put=50,get=40,delete=10
+          - --size=fixed:1MiB
+          - --keys=50000
+          - --prefix=bench/
+          - --pattern=random:42
+          - --verify-rate=0.1
+          - --duration=20m
+          - --metrics-port=9090
+          - --log-level=info
+          - --http-bind=0.0.0.0
+        
+        env:
+        - name: S3_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: endpoint
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: region
+        - name: S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: s3-workload-config
+              key: bucket
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: s3-creds
+              key: accessKey
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: s3-creds
+              key: secretKey
+        
+        ports:
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "2000m"
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 10001
+          capabilities:
+            drop:
+              - ALL
+
