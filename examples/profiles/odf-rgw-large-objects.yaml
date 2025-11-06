@@ -34,6 +34,12 @@ key_template: "large-{seq:06}.bin"
 pattern: "random:99999"
 verify_rate: 0.1
 
+# Multipart upload configuration for large objects
+multipart_enabled: true
+multipart_threshold: 52428800     # 50 MiB - objects above this use multipart
+multipart_part_size: 10485760     # 10 MiB per part
+multipart_max_parts: 4            # 4 concurrent part uploads
+
 # No rate limiting
 rate_type: "fixed"
 rate_limit: 0

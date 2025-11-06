@@ -38,6 +38,12 @@ type Config struct {
 	KeyTemplate string `mapstructure:"key_template"`
 	RandomKeys  bool   `mapstructure:"random_keys"`
 
+	// Multipart Upload Configuration
+	MultipartEnabled   bool   `mapstructure:"multipart_enabled"`
+	MultipartThreshold int64  `mapstructure:"multipart_threshold"` // Size threshold to trigger multipart (bytes)
+	MultipartPartSize  int64  `mapstructure:"multipart_part_size"` // Size of each part (bytes)
+	MultipartMaxParts  int    `mapstructure:"multipart_max_parts"` // Maximum number of parts to upload concurrently
+
 	// Data Pattern & Verification
 	Pattern    string  `mapstructure:"pattern"`     // "random:42", "fixed:DEADBEEF"
 	VerifyRate float64 `mapstructure:"verify_rate"` // 0.0 - 1.0
@@ -89,6 +95,11 @@ func NewConfig() *Config {
 		KeyTemplate: "obj-{seq:08}.bin",
 		RandomKeys:  false,
 
+		MultipartEnabled:   false,
+		MultipartThreshold: 100 * 1024 * 1024, // 100 MiB
+		MultipartPartSize:  10 * 1024 * 1024,  // 10 MiB (minimum is 5 MiB)
+		MultipartMaxParts:  4,                  // Concurrent part uploads
+
 		Pattern:    "random:42",
 		VerifyRate: 0.1,
 
@@ -137,6 +148,12 @@ func (c *Config) BindFlags(flags *pflag.FlagSet) error {
 	flags.String("prefix", c.Prefix, "Key prefix")
 	flags.String("key-template", c.KeyTemplate, "Key template with {seq} placeholder")
 	flags.Bool("random-keys", c.RandomKeys, "Use random key selection")
+
+	// Multipart Upload Configuration
+	flags.Bool("multipart-enabled", c.MultipartEnabled, "Enable multipart upload for large objects")
+	flags.Int64("multipart-threshold", c.MultipartThreshold, "Size threshold to trigger multipart upload (bytes)")
+	flags.Int64("multipart-part-size", c.MultipartPartSize, "Size of each multipart upload part (bytes, min 5MiB)")
+	flags.Int("multipart-max-parts", c.MultipartMaxParts, "Maximum concurrent part uploads")
 
 	// Data Pattern & Verification
 	flags.String("pattern", c.Pattern, "Data pattern: random:<seed> or fixed:<hex>")
@@ -271,6 +288,24 @@ func (c *Config) Validate() error {
 	validLevels := map[string]bool{"debug": true, "info": true, "warn": true, "error": true}
 	if !validLevels[c.LogLevel] {
 		return fmt.Errorf("invalid log level: %s", c.LogLevel)
+	}
+
+	// Validate multipart configuration
+	if c.MultipartEnabled {
+		minPartSize := int64(5 * 1024 * 1024) // 5 MiB minimum
+		if c.MultipartPartSize < minPartSize {
+			return fmt.Errorf("multipart part size must be at least 5 MiB, got %d bytes", c.MultipartPartSize)
+		}
+		if c.MultipartThreshold < minPartSize {
+			return fmt.Errorf("multipart threshold must be at least 5 MiB, got %d bytes", c.MultipartThreshold)
+		}
+		if c.MultipartMaxParts < 1 {
+			return fmt.Errorf("multipart max parts must be >= 1")
+		}
+		// S3 supports up to 10,000 parts per upload
+		if c.MultipartMaxParts > 10000 {
+			return fmt.Errorf("multipart max parts must be <= 10000")
+		}
 	}
 
 	return nil

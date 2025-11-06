@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -346,6 +347,145 @@ func (c *Client) ListObjects(ctx context.Context, prefix string, maxKeys int32) 
 	)
 
 	return keys, nil
+}
+
+// MultipartUpload performs a multipart upload for large objects
+func (c *Client) MultipartUpload(ctx context.Context, key string, body io.ReadSeeker, size int64, partSize int64, maxConcurrency int, metadata map[string]string) error {
+	start := time.Now()
+
+	// Initiate multipart upload
+	createResp, err := c.s3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+		Bucket:   aws.String(c.bucket),
+		Key:      aws.String(key),
+		Metadata: metadata,
+	})
+
+	if err != nil {
+		c.metrics.RecordOp(string(metrics.OpMultipartPut), string(metrics.StatusError), time.Since(start))
+		return fmt.Errorf("failed to initiate multipart upload: %w", err)
+	}
+
+	uploadID := createResp.UploadId
+	if uploadID == nil {
+		c.metrics.RecordOp(string(metrics.OpMultipartPut), string(metrics.StatusError), time.Since(start))
+		return fmt.Errorf("upload ID is nil")
+	}
+
+	// Calculate number of parts
+	numParts := int((size + partSize - 1) / partSize)
+	completedParts := make([]types.CompletedPart, numParts)
+
+	// Create semaphore for concurrency control
+	sem := make(chan struct{}, maxConcurrency)
+	errChan := make(chan error, numParts)
+	var wg sync.WaitGroup
+
+	// Upload parts concurrently
+	for partNum := 1; partNum <= numParts; partNum++ {
+		wg.Add(1)
+		go func(partNumber int) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			// Calculate part boundaries
+			offset := int64(partNumber-1) * partSize
+			length := partSize
+			if offset+length > size {
+				length = size - offset
+			}
+
+			// Seek to the correct position
+			if _, err := body.Seek(offset, io.SeekStart); err != nil {
+				errChan <- fmt.Errorf("failed to seek to offset %d: %w", offset, err)
+				return
+			}
+
+			// Create a limited reader for this part
+			partReader := io.LimitReader(body, length)
+
+			// Upload part
+			uploadPartResp, err := c.s3Client.UploadPart(ctx, &s3.UploadPartInput{
+				Bucket:        aws.String(c.bucket),
+				Key:           aws.String(key),
+				UploadId:      uploadID,
+				PartNumber:    aws.Int32(int32(partNumber)),
+				Body:          partReader,
+				ContentLength: aws.Int64(length),
+			})
+
+			if err != nil {
+				errChan <- fmt.Errorf("failed to upload part %d: %w", partNumber, err)
+				return
+			}
+
+			completedParts[partNumber-1] = types.CompletedPart{
+				ETag:       uploadPartResp.ETag,
+				PartNumber: aws.Int32(int32(partNumber)),
+			}
+		}(partNum)
+	}
+
+	// Wait for all parts to complete
+	wg.Wait()
+	close(errChan)
+
+	// Check for errors
+	var uploadErrors []error
+	for err := range errChan {
+		uploadErrors = append(uploadErrors, err)
+	}
+
+	if len(uploadErrors) > 0 {
+		// Abort multipart upload on error
+		_, abortErr := c.s3Client.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
+			Bucket:   aws.String(c.bucket),
+			Key:      aws.String(key),
+			UploadId: uploadID,
+		})
+
+		if abortErr != nil {
+			c.logger.Warn("failed to abort multipart upload after error",
+				zap.String("key", key),
+				zap.Error(abortErr),
+			)
+		}
+
+		duration := time.Since(start)
+		c.metrics.RecordOp(string(metrics.OpMultipartPut), string(metrics.StatusError), duration)
+		return fmt.Errorf("multipart upload failed with %d errors: %v", len(uploadErrors), uploadErrors[0])
+	}
+
+	// Complete multipart upload
+	_, err = c.s3Client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+		Bucket:   aws.String(c.bucket),
+		Key:      aws.String(key),
+		UploadId: uploadID,
+		MultipartUpload: &types.CompletedMultipartUpload{
+			Parts: completedParts,
+		},
+	})
+
+	duration := time.Since(start)
+
+	if err != nil {
+		c.metrics.RecordOp(string(metrics.OpMultipartPut), string(metrics.StatusError), duration)
+		return fmt.Errorf("failed to complete multipart upload: %w", err)
+	}
+
+	c.metrics.RecordOp(string(metrics.OpMultipartPut), string(metrics.StatusSuccess), duration)
+	c.metrics.RecordBytesWritten(size)
+
+	c.logger.Debug("multipart upload completed",
+		zap.String("key", key),
+		zap.Int64("size", size),
+		zap.Int("parts", numParts),
+		zap.Duration("latency", duration),
+	)
+
+	return nil
 }
 
 // DeleteObjectsByMetadata deletes objects matching specific metadata

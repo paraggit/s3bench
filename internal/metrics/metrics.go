@@ -208,10 +208,11 @@ const (
 type OpType string
 
 const (
-	OpPut    OpType = "put"
-	OpGet    OpType = "get"
-	OpDelete OpType = "delete"
-	OpCopy   OpType = "copy"
-	OpList   OpType = "list"
-	OpHead   OpType = "head"
+	OpPut          OpType = "put"
+	OpGet          OpType = "get"
+	OpDelete       OpType = "delete"
+	OpCopy         OpType = "copy"
+	OpList         OpType = "list"
+	OpHead         OpType = "head"
+	OpMultipartPut OpType = "multipart_put"
 )

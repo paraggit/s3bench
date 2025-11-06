@@ -8,7 +8,8 @@ Fully compatible with **OpenShift Data Foundation (ODF)** and **Ceph Rados Gatew
 
 ## Features
 
-- **Comprehensive S3 Operations**: PUT, GET, DELETE, COPY, LIST, HEAD with configurable operation mix
+- **Comprehensive S3 Operations**: PUT, GET, DELETE, COPY, LIST, HEAD, MULTIPART_PUT with configurable operation mix
+- **Multipart Upload Support**: Efficient upload of large objects with configurable part size and concurrent part uploads
 - **Data Verification**: Deterministic data generation with SHA-256 verification
 - **Flexible Configuration**: Object size distributions, keyspace control, operation mix percentages
 - **Production-Ready**: Prometheus metrics, health endpoints, structured logging, graceful shutdown
@@ -162,12 +163,90 @@ Pre-configured profiles available in `examples/profiles/`:
 - `balanced.yaml` - General purpose workload (50% PUT, 50% GET)
 - `read-heavy.yaml` - Read-intensive workload (80% reads)
 - `write-heavy.yaml` - Write-intensive workload (70% writes)
+- **`multipart-large-objects.yaml`** - Multipart upload testing for large objects (500 MiB avg)
 - **`odf-rgw-balanced.yaml`** - Balanced workload optimized for ODF/RGW
 - **`odf-rgw-read-heavy.yaml`** - Read-heavy workload for RGW
 - **`odf-rgw-write-heavy.yaml`** - Write-heavy workload for RGW
-- **`odf-rgw-large-objects.yaml`** - Large object testing for RGW
+- **`odf-rgw-large-objects.yaml`** - Large object testing for RGW with multipart upload
 
 Use with: `--config examples/profiles/odf-rgw-balanced.yaml`
+
+## Multipart Upload
+
+The tool supports multipart upload for efficient handling of large objects. Multipart upload can be enabled in two ways:
+
+### 1. Automatic Multipart Upload (Recommended)
+
+Enable automatic multipart upload for objects exceeding a size threshold:
+
+```bash
+s3-workload \
+  --endpoint https://s3.amazonaws.com \
+  --bucket my-bucket \
+  --multipart-enabled \
+  --multipart-threshold 104857600 \      # 100 MiB threshold
+  --multipart-part-size 10485760 \       # 10 MiB parts
+  --multipart-max-parts 4 \              # 4 concurrent part uploads
+  --size fixed:500MiB \
+  --mix put=100
+```
+
+When enabled, PUT operations for objects larger than the threshold will automatically use multipart upload.
+
+### 2. Explicit Multipart Upload
+
+Use `multipart_put` in the operation mix to always use multipart upload:
+
+```bash
+s3-workload \
+  --endpoint https://s3.amazonaws.com \
+  --bucket my-bucket \
+  --multipart-part-size 10485760 \
+  --multipart-max-parts 8 \
+  --size fixed:1GiB \
+  --mix multipart_put=50,get=50
+```
+
+### Multipart Upload Parameters
+
+- `--multipart-enabled`: Enable automatic multipart upload for large objects (default: false)
+- `--multipart-threshold`: Size threshold in bytes to trigger multipart upload (default: 100 MiB, min: 5 MiB)
+- `--multipart-part-size`: Size of each multipart part in bytes (default: 10 MiB, min: 5 MiB)
+- `--multipart-max-parts`: Maximum number of parts to upload concurrently (default: 4, max: 10000)
+
+### Example Configuration for Large Objects
+
+```yaml
+endpoint: https://s3.amazonaws.com
+region: us-east-1
+bucket: large-object-bench
+concurrency: 16
+duration: 30m
+
+# Object configuration
+size: "dist:lognormal:mean=500MiB,std=0.5"
+keys: 1000
+prefix: "large-objects/"
+
+# Multipart configuration
+multipart_enabled: true
+multipart_threshold: 104857600    # 100 MiB
+multipart_part_size: 52428800     # 50 MiB parts
+multipart_max_parts: 8            # 8 concurrent uploads
+
+# Operation mix
+mix:
+  put: 40
+  get: 40
+  delete: 10
+  list: 10
+```
+
+### Performance Tips
+
+1. **Part Size**: Larger part sizes reduce API calls but increase memory usage. The optimal size depends on your network and object storage configuration.
+2. **Concurrency**: Higher concurrent part uploads increase throughput but consume more network bandwidth and memory. Start with 4-8 and adjust based on your environment.
+3. **Threshold**: Set the threshold based on your typical object sizes. Objects below the threshold use regular PUT operations.
 
 ## Metrics
 

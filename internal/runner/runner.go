@@ -227,6 +227,8 @@ func (r *Runner) executeOp(ctx context.Context, op workload.OpType, rng *rand.Ra
 	switch op {
 	case workload.OpPut:
 		err = r.executePut(ctx, key)
+	case workload.OpMultipartPut:
+		err = r.executeMultipartPut(ctx, key)
 	case workload.OpGet:
 		err = r.executeGet(ctx, key, rng)
 	case workload.OpDelete:
@@ -252,6 +254,11 @@ func (r *Runner) executeOp(ctx context.Context, op workload.OpType, rng *rand.Ra
 func (r *Runner) executePut(ctx context.Context, key string) error {
 	size := r.sizeDist.Next()
 
+	// Check if we should use multipart upload
+	if r.cfg.MultipartEnabled && size >= r.cfg.MultipartThreshold {
+		return r.executeMultipartPutWithSize(ctx, key, size)
+	}
+
 	// Generate data and hash
 	reader, hash, err := r.generator.GenerateAndHash(key, size)
 	if err != nil {
@@ -275,6 +282,46 @@ func (r *Runner) executePut(ctx context.Context, key string) error {
 
 	if err != nil {
 		r.metrics.RecordRetry(string(workload.OpPut))
+	}
+
+	return err
+}
+
+// executeMultipartPut executes a multipart PUT operation (explicit)
+func (r *Runner) executeMultipartPut(ctx context.Context, key string) error {
+	size := r.sizeDist.Next()
+	return r.executeMultipartPutWithSize(ctx, key, size)
+}
+
+// executeMultipartPutWithSize executes a multipart PUT operation with a given size
+func (r *Runner) executeMultipartPutWithSize(ctx context.Context, key string, size int64) error {
+	// Generate data and hash
+	reader, hash, err := r.generator.GenerateAndHash(key, size)
+	if err != nil {
+		return fmt.Errorf("failed to generate data: %w", err)
+	}
+
+	// Prepare metadata
+	metadata := data.PrepareMetadata(hash, r.cfg.NamespaceTag)
+
+	// Upload with retry
+	retryCfg := s3.DefaultRetryConfig()
+	retryCfg.MaxAttempts = r.cfg.MaxRetries
+
+	err = s3.WithRetry(ctx, retryCfg, r.logger, "multipart_put", func(ctx context.Context) error {
+		return r.s3Client.MultipartUpload(
+			ctx,
+			key,
+			reader,
+			size,
+			r.cfg.MultipartPartSize,
+			r.cfg.MultipartMaxParts,
+			metadata,
+		)
+	})
+
+	if err != nil {
+		r.metrics.RecordRetry(string(workload.OpMultipartPut))
 	}
 
 	return err

@@ -40,6 +40,15 @@
 | `--key-template` | string | obj-{seq:08}.bin | Key template with {seq} or {seq:08} placeholder |
 | `--random-keys` | bool | false | Use random key selection instead of sequential |
 
+### Multipart Upload Configuration
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--multipart-enabled` | bool | false | Enable automatic multipart upload for large objects |
+| `--multipart-threshold` | int64 | 104857600 | Size threshold in bytes to trigger multipart upload (default: 100 MiB) |
+| `--multipart-part-size` | int64 | 10485760 | Size of each multipart part in bytes (default: 10 MiB, min: 5 MiB) |
+| `--multipart-max-parts` | int | 4 | Maximum number of parts to upload concurrently (max: 10000) |
+
 ### Data Pattern & Verification
 
 | Flag | Type | Default | Description |
@@ -136,6 +145,36 @@ s3-workload \
   --keep-data
 ```
 
+### Multipart Upload (Automatic)
+
+```bash
+s3-workload \
+  --endpoint https://s3.amazonaws.com \
+  --bucket large-objects \
+  --multipart-enabled \
+  --multipart-threshold 104857600 \
+  --multipart-part-size 52428800 \
+  --multipart-max-parts 8 \
+  --size fixed:500MiB \
+  --concurrency 16 \
+  --mix put=80,get=20 \
+  --duration 20m
+```
+
+### Multipart Upload (Explicit)
+
+```bash
+s3-workload \
+  --endpoint https://s3.amazonaws.com \
+  --bucket large-objects \
+  --multipart-part-size 10485760 \
+  --multipart-max-parts 8 \
+  --size fixed:1GiB \
+  --concurrency 8 \
+  --mix multipart_put=60,get=40 \
+  --duration 30m
+```
+
 ### Cleanup Mode
 
 ```bash
@@ -204,7 +243,8 @@ Specify percentages for each operation. They will be normalized to 100%.
 ```
 
 Supported operations:
-- `put` - Upload object
+- `put` - Upload object (automatically uses multipart for large objects if enabled)
+- `multipart_put` - Upload object using multipart upload (explicit)
 - `get` - Download object
 - `delete` - Delete object
 - `copy` - Copy object

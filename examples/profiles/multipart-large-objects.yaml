@@ -1,0 +1,58 @@
+# Multipart Upload Profile for Large Objects
+# Demonstrates multipart upload for testing large object performance
+
+endpoint: "https://s3.amazonaws.com"
+region: "us-east-1"
+bucket: "multipart-bench-bucket"
+path_style: false
+skip_tls_verify: false
+create_bucket: true
+
+# Moderate concurrency to manage memory with large objects
+concurrency: 16
+
+# Operation mix focused on large uploads and reads
+# 60% multipart PUT - Upload large objects with multipart
+# 30% GET - Read large objects
+# 10% DELETE - Cleanup
+mix:
+  multipart_put: 60
+  get: 30
+  delete: 10
+
+duration: 30m
+
+# Large objects with log-normal distribution
+# Mean of 500MiB - typical for large file uploads
+size: "dist:lognormal:mean=500MiB,std=0.5"
+
+# Smaller keyspace due to large object sizes
+keys: 5000
+prefix: "multipart-bench/"
+key_template: "large-{seq:06}.bin"
+
+pattern: "random:12345"
+verify_rate: 0.1
+
+# Multipart upload configuration
+multipart_enabled: true
+multipart_threshold: 104857600    # 100 MiB - objects above this use multipart
+multipart_part_size: 52428800     # 50 MiB per part
+multipart_max_parts: 8            # 8 concurrent part uploads
+
+# No rate limiting
+rate_type: "fixed"
+rate_limit: 0
+
+# Longer timeout for large objects
+op_timeout: 600s  # 10 minutes
+max_retries: 2
+retry_backoff: 500ms
+
+namespace_tag: "workload=multipart-large"
+keep_data: false
+
+metrics_port: 9090
+http_bind: "0.0.0.0"
+log_level: "info"
+
