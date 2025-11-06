@@ -177,9 +177,10 @@ func (c *Config) BindFlags(flags *pflag.FlagSet) error {
 func Load(flags *pflag.FlagSet) (*Config, error) {
 	cfg := NewConfig()
 
-	// Bind flags
-	if err := cfg.BindFlags(flags); err != nil {
-		return nil, fmt.Errorf("failed to bind flags: %w", err)
+	// Note: Flags should already be bound by the caller (via BindFlags)
+	// We just need to bind them to viper here
+	if err := viper.BindPFlags(flags); err != nil {
+		return nil, fmt.Errorf("failed to bind flags to viper: %w", err)
 	}
 
 	// Load config file if specified
